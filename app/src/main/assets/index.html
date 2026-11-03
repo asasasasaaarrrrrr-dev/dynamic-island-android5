@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dynamic Island & Jailbreak Simulator</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --card-bg: rgba(28, 28, 30, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #ffffff;
+      --text-muted: #8e8e93;
+      --accent: #007aff;
+      --accent-green: #34c759;
+      --accent-red: #ff3b30;
+      --island-bg: #000000;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: #0b0c10;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .phone-frame {
+      width: 100%;
+      max-width: 410px;
+      height: 840px;
+      background: radial-gradient(circle at 50% 0%, #1c2333 0%, #000000 70%);
+      border-radius: 54px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), inset 0 0 0 4px #2c2c2e, 0 0 0 8px #141416;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status-bar {
+      height: 48px;
+      padding: 10px 28px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 50;
+    }
+
+    .status-icons {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    /* Dynamic Island */
+    .island-container {
+      position: absolute;
+      top: 11px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+    }
+
+    .dynamic-island {
+      background: #000;
+      color: #fff;
+      height: 28px;
+      width: 92px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7), 0 0 0 0.5px rgba(255,255,255,0.15);
+      transition: all 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      overflow: hidden;
+    }
+
+    .dynamic-island.active {
+      width: 220px;
+      height: 32px;
+      width: 122px;
+      padding: 0 10px;
+    }
+
+    .dynamic-island.expanded {
+      width: min(190px, calc(100vw - 64px));
+      height: 58px;
+      border-radius: 28px;
+      padding: 10px;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .island-left, .island-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .dynamic-island.active .island-left,
+    .dynamic-island.active .island-right,
+    .dynamic-island.expanded .island-left,
+    .dynamic-island.expanded .island-right {
+      opacity: 1;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34c759;
+      box-shadow: 0 0 8px #34c759;
+      animation: pulse 1.6s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.7; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.7; }
+    }
+
+    /* Content Area */
+    .screen-content {
+      flex: 1;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .header-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .title-group h2 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .title-group p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* iOS Switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 52px;
+      height: 32px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #39393d;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 28px;
+      width: 28px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 50%;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent-green);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    /* Section Tabs / Banner */
+    .banner-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(20px);
+      border-radius: 28px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .tab-switcher {
+      display: flex;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 4px;
+      border-radius: 14px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      padding: 10px 0;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    }
+
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    /* Tweaks List */
+    .tweak-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255,255,255,0.03);
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .tweak-info h4 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .tweak-info p {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: rgba(52, 199, 89, 0.15);
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    /* Action Tab */
+    .apply-card {
+      text-align: center;
+      padding: 24px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .jailbreak-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #ff2d55, #ff375f);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 24px rgba(255, 45, 85, 0.35);
+      font-size: 28px;
+    }
+
+    .btn-apply {
+      width: 100%;
+      background: linear-gradient(135deg, #007aff, #0056b3);
+      color: white;
+      border: none;
+      padding: 16px;
+      border-radius: 18px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0, 122, 255, 0.35);
+      transition: transform 0.15s ease, filter 0.2s ease;
+    }
+
+    .btn-apply:active {
+      transform: scale(0.97);
+    }
+
+    /* Fake Terminal Modal */
+    .terminal-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #000;
+      z-index: 200;
+      display: none;
+      flex-direction: column;
+      padding: 60px 24px 30px;
+      font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    }
+
+    .terminal-overlay.show {
+      display: flex;
+    }
+
+    .terminal-header {
+      color: #ff375f;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .terminal-logs {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #34c759;
+    }
+
+    .terminal-logs .dim {
+      color: #636366;
+    }
+
+    .terminal-logs .highlight {
+      color: #5ac8fa;
+    }
+
+    /* Respring Overlay */
+    .respring-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #000;
+      z-index: 300;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .respring-overlay.show {
+      display: flex;
+    }
+
+    .apple-spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="phone-frame">
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span id="clock">12:41</span>
+    <div class="status-icons">
+      <span>5G</span>
+      <span>100%</span>
+    </div>
+  </div>
+
+  <!-- Dynamic Island -->
+  <div class="island-container">
+    <div class="dynamic-island" id="dynamicIsland">
+      <div class="island-left" id="islandLeft">
+      </div>
+      <div class="island-right" id="islandRight">
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen Content -->
+  <div class="screen-content">
+    <!-- Header with Toggle -->
+    <div class="header-card">
+      <div class="title-group">
+        <h2>Dynamic Island</h2>
+        <p>Dynamic Island для Android</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="islandToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Dual Section Banner -->
+    <div class="banner-container">
+      <div class="tab-switcher">
+        <button class="tab-btn active" onclick="switchTab('tweaks')">1. Твики</button>
+        <button class="tab-btn" onclick="switchTab('apply')">2. Принять</button>
+      </div>
+
+      <!-- Tab 1: Tweaks -->
+      <div class="tab-content active" id="tab-tweaks">
+        <div class="tweak-item">
+          <div class="tweak-info">
+            <h4>Dopamine 2.x Exploit</h4>
+            <p>arm64e PPL bypass & kfd</p>
+          </div>
+          <span class="badge">Готов</span>
+        </div>
+        <div class="tweak-item">
+          <div class="tweak-info">
+            <h4>DynamicIslandController</h4>
+            <p>UIWindow & SpringBoard Hook</p>
+          </div>
+          <span class="badge">Готов</span>
+        </div>
+        <div class="tweak-item">
+          <div class="tweak-info">
+            <h4>MobileGestalt Patcher</h4>
+            <p>DeviceSubType 2556 Injection</p>
+          </div>
+          <span class="badge">Готов</span>
+        </div>
+      </div>
+
+      <!-- Tab 2: Apply -->
+      <div class="tab-content" id="tab-apply">
+        <div class="apply-card">
+          <div class="jailbreak-icon">⚡</div>
+          <h3>Применение изменений</h3>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
+            Запусти демонстрацию применения настроек. После неё появится настоящий Android-оверлей Dynamic Island. Джейлбрейк не выполняется.
+          </p>
+          <button class="btn-apply" onclick="startFakeJailbreak()">Применить все настройки</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fake Terminal Screen -->
+  <div class="terminal-overlay" id="terminalOverlay">
+    <div class="terminal-header">DYNAMIC ISLAND SETUP (DEMO)</div>
+    <div class="terminal-logs" id="terminalLogs"></div>
+  </div>
+
+  <!-- Fake Respring Screen -->
+  <div class="respring-overlay" id="respringOverlay">
+    <div class="apple-spinner"></div>
+  </div>
+</div>
+
+<script>
+  // Clock update
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('clock').textContent = `${h}:${m}`;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Audio is optional; unsupported Web Audio must not stop the setup flow.
+  let audioCtx = null;
+  function playClickSound(freq = 400, dur = 0.05) {
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      if (!audioCtx) audioCtx = new AudioContextClass();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + dur);
+    } catch (_) {
+      // Keep the app functional without sound.
+    }
+  }
+
+  // Toggle Dynamic Island
+  const toggle = document.getElementById('islandToggle');
+  const island = document.getElementById('dynamicIsland');
+
+  toggle.addEventListener('change', () => {
+    playClickSound(toggle.checked ? 600 : 300);
+    if (toggle.checked) {
+      island.classList.add('active');
+    } else {
+      island.classList.remove('active', 'expanded');
+    }
+  });
+
+  // Tab switching
+  function switchTab(tabName) {
+    playClickSound(500, 0.03);
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+    if (tabName === 'tweaks') {
+      document.querySelectorAll('.tab-btn')[0].classList.add('active');
+      document.getElementById('tab-tweaks').classList.add('active');
+    } else {
+      document.querySelectorAll('.tab-btn')[1].classList.add('active');
+      document.getElementById('tab-apply').classList.add('active');
+    }
+  }
+
+  // Display-only setup animation; it does not perform a jailbreak.
+  const logSteps = [
+    { text: "[*] Подготовка интерфейса Dynamic Island…", delay: 300 },
+    { text: "[*] Проверка конфигурации оверлея…", delay: 700 },
+    { text: "[+] Настройка анимации плашки…", delay: 1100 },
+    { text: "[+] Подготовка службы Android…", delay: 1600 },
+    { text: "[*] Завершение демонстрации…", delay: 2600 },
+    { text: "[✓] Демонстрация завершена. Запускаю оверлей…", delay: 4800 }
+  ];
+
+  function startFakeJailbreak() {
+    playClickSound(800, 0.1);
+    const terminal = document.getElementById('terminalOverlay');
+    const logs = document.getElementById('terminalLogs');
+    const respring = document.getElementById('respringOverlay');
+    
+    logs.innerHTML = '';
+    terminal.classList.add('show');
+
+    logSteps.forEach(step => {
+      setTimeout(() => {
+        const line = document.createElement('div');
+        line.innerHTML = step.text;
+        logs.appendChild(line);
+        terminal.scrollTop = terminal.scrollHeight;
+        playClickSound(450 + Math.random() * 200, 0.02);
+      }, step.delay);
+    });
+
+    // Respring phase
+    setTimeout(() => {
+      terminal.classList.remove('show');
+      respring.classList.add('show');
+    }, 5400);
+
+    // Boot back
+    setTimeout(() => {
+      respring.classList.remove('show');
+      toggle.checked = true;
+      island.classList.add('active', 'expanded');
+      try {
+        if (window.NativeControls) NativeControls.enableIsland();
+      } catch (_) {
+        // The in-app preview remains visible if the native bridge is unavailable.
+      }
+
+      setTimeout(() => {
+        island.classList.remove('expanded');
+      }, 3500);
+    }, 8000);
+  }
+</script>
+</body>
+</html>
